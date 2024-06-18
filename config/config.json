@@ -1,0 +1,35 @@
+{
+  "development": {
+    "username": "root",
+    "password": "pass123",
+    "database": "birdfeed",
+    "host": "127.0.0.1",
+    "dialect": "mysql",
+    "timezone": "+04:00",
+    "logging": false
+  },
+  "test": {
+    "username": "root",
+    "password": null,
+    "database": "birdfeed",
+    "host": "127.0.0.1",
+    "dialect": "mysql",
+    "timezone": "+04:00"
+  },
+  "production": {
+    "username": "okab_birdfeed",
+    "password": "FeedBird@23",
+    "database": "okab_newbirdfeed",
+    "host": "127.0.0.1",
+    "dialect": "mysql",
+    "timezone": "+04:00"
+  },
+  "docker": {
+    "username": "feederadmin",
+    "password": "123abc",
+    "database": "birdfeed",
+    "host": "mysql_server",
+    "dialect": "mysql",
+    "timezone": "+04:00"
+  }
+}

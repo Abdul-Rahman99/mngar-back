@@ -2,7 +2,7 @@
 # Stage 1: Build the Node.js application
 FROM node:18-alpine as node_build
 
-WORKDIR /usr/src/app
+WORKDIR /
 
 COPY package*.json .
 

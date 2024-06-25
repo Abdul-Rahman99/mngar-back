@@ -95,10 +95,6 @@ const ExecuteFeedNow = async (req, res) => {
     console.log("command", message);
     PublishCommand(topic, message);
     await models.AuditLogs.create({ command: message, user_id: userId });
-    await models.FeedingDone.create({
-      client_message: command,
-      feeder_id: feederId,
-    });
     const response = {
       status: true,
     };

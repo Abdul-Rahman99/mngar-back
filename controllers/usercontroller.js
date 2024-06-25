@@ -600,12 +600,14 @@ const updatePassword = async (req, res) => {
 };
 const deleteUser = async (req, res) => {
   try {
+    await models.sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
     await models.Users.destroy({
       where: {
         id: req.params.userId,
       },
     });
 
+    await models.sequelize.query("SET FOREIGN_KEY_CHECKS = 1");
     const response = {
       status: true,
       data: "User deleted successfully",

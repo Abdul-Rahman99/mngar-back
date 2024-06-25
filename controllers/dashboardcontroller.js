@@ -6,148 +6,18 @@ const { FeedingDevices, FoodSchedules, FeedingDone } = require("../models");
 const { now } = require("moment");
 const getBirdFeedingDevices = (req, res) => {};
 
-// const getFeedPercentage = (ping_dist) => {
-//   // if (ping_dist >= 64) {
-//   //   return 0;
-//   // } else if (ping_dist >= 55) {
-//   //   return 20;
-//   // } else if (ping_dist >= 44) {
-//   //   return 40;
-//   // } else if (ping_dist >= 35) {
-//   //   return 60;
-//   // } else if (ping_dist >= 20) {
-//   //   return 80;
-//   // } else {
-//   //   return 100;
-//   // }
-//   //   console.log("PING DISTTTTTTTTTT: "+ ping_dist);
-//   // let total_cm = 70;
-//   // if (ping_dist > total_cm) {
-//   //     ping_dist = 70;
-//   // }
-//   // return Math.round((total_cm - ping_dist) * 100 / total_cm);
-// };
-
-// const getFeedLevelData = async (req, res) => {
-//   let date_now = new Date();
-//   let date_pre = date_now - 518400000; //432000000;
-
-//   date_now = new Date(date_now);
-//   date_pre = new Date(date_pre);
-
-//   var loggedInUserId = req.session?.user?.id;
-//   if (!loggedInUserId) {
-//     loggedInUserId = "";
-//   } else {
-//     loggedInUserId = `AND UserDevices.user_id = ${loggedInUserId}`;
-//   }
-//   const query = `SELECT
-//                         FeedingDevices.id,
-//                         FeedingDevices.title,
-//                         FeedingDevices.mac_address,
-//                         FeedingDevices.location,
-//                         FeedingDevices.other_info,
-//                         FeedingDevices.feeder_id
-//                     FROM
-//                         FeedingDevices
-//                     INNER JOIN
-//                         UserDevices ON UserDevices.feeder_id = FeedingDevices.id
-//                     WHERE
-//                         1=1 ${loggedInUserId}`;
-//   const records = await models.sequelize.query(query, {
-//     type: QueryTypes.SELECT,
-//   });
-
-//   let newAr = {};
-//   let LowFeedLevels = [];
-//   let AllFeedLevels = [];
-//   for (i = 0; i < records.length; i++) {
-//     let feederId = records[i].id;
-//     let tankLevel = await getFeedPercentage(feederId);
-//     let myNewAr = {
-//       id: feederId,
-//       tankLevel: tankLevel,
-//       title: records[i].title,
-//       location: records[i].location,
-//       other_info: records[i].other_info,
-//     };
-//     AllFeedLevels.push(myNewAr);
-//     if (tankLevel <= 30) {
-//       LowFeedLevels.push(feederId);
-//     }
-//   }
-//   newAr = {
-//     all: AllFeedLevels,
-//     all_c: AllFeedLevels.length,
-//     low_c: LowFeedLevels.length,
-//   };
-//   res.status(200).send(newAr);
-// };
-// const getFeedPercentage = async (feederId) => {
-//   // Fetch tank capacity and current feed level from FeedingDevices table
-//   const feedingDevice = await models.FeedingDevices.findOne({
-//     where: {
-//       id: feederId,
-//     },
-//     attributes: ["tank_capacity", "feed_level"],
-//   });
-
-//   if (!feedingDevice) {
-//     throw new Error(`Feeding device with id ${feederId} not found`);
-//   }
-
-//   const { tank_capacity, feed_level } = feedingDevice;
-
-//   // Calculate the feed level percentage
-//   const feedLevelPercentage = (feed_level / tank_capacity) * 100;
-
-//   return feedLevelPercentage;
-// };
-// const getFeedPercentage = async (feederId) => {
-//   const tankCapacity = 800; // Assuming a constant tank capacity as you mentioned earlier
-
-//   // Fetch feeding done records from 11/6 until now
-//   const startDate = new Date("2024-06-11");
-//   const endDate = new Date();
-
-//   const feedingDoneRecords = await models.FeedingDone.findAll({
-//     where: {
-//       feeder_id: feederId,
-//       createdAt: {
-//         [Op.between]: [startDate, endDate],
-//       },
-//     },
-//   });
-
-//   let totalFeedUsed = 0;
-
-//   // Calculate feed used based on feeding done records
-//   feedingDoneRecords.forEach((record) => {
-//     const clientMessage = JSON.parse(record.client_message);
-//     const milliseconds = parseInt(clientMessage["61"], 10);
-//     const seconds = milliseconds / 1000;
-//     totalFeedUsed += seconds * 0.4;
-//   });
-
-//   const adjustedFeedUsed = Math.max(0, totalFeedUsed);
-//   const remainingFeed = tankCapacity - adjustedFeedUsed;
-//   const feedLevelPercentage = (remainingFeed / tankCapacity) * 100;
-
-//   return feedLevelPercentage;
-// };
-
 const getFeedPercentage = async (feederId) => {
   const tankCapacity = 800; // Assuming a constant tank capacity
   const startDate = new Date("2024-06-11");
   const endDate = new Date(); // Current date and time
 
   console.log(
-    `Fetching records from ${startDate.toISOString()} to ${endDate.toISOString()}`
+    `Fetching records from ${startDate.toISOString()} to ${endDate.toISOString()} for feederId ${feederId}`
   );
 
   try {
     // Fetch feeding done records from 2024-06-11 until now
-    const feedingDoneRecords = await models.FeedingDone.findAll({
+    const feedingDonePromise = models.FeedingDone.findAll({
       where: {
         feeder_id: feederId,
         createdAt: {
@@ -156,8 +26,31 @@ const getFeedPercentage = async (feederId) => {
       },
     });
 
+    // Fetch client messages with specific topic and pattern in client_message
+    const clientMessagesPromise = models.ClientMessages.findAll({
+      where: {
+        feeder_id: feederId,
+        client_topic: "response",
+        createdAt: {
+          [Op.between]: [startDate, endDate],
+        },
+        client_message: {
+          [Op.like]: '%"0":"ctrl_feed_now_done"%',
+        },
+      },
+    });
+
+    // Execute both queries concurrently
+    const [feedingDoneRecords, clientMessages] = await Promise.all([
+      feedingDonePromise,
+      clientMessagesPromise,
+    ]);
+
     console.log(
-      `Fetched ${feedingDoneRecords.length} records from the database.`
+      `Fetched ${feedingDoneRecords.length} records from FeedingDone.`
+    );
+    console.log(
+      `Fetched ${clientMessages.length} records from ClientMessages.`
     );
 
     let totalFeedUsed = 0;
@@ -168,15 +61,17 @@ const getFeedPercentage = async (feederId) => {
         const clientMessage = JSON.parse(record.client_message);
         const milliseconds = parseInt(clientMessage["61"], 10);
         console.log(
-          `Parsed milliseconds: ${milliseconds} from record: ${record.client_message}`
+          `Parsed milliseconds from 61: ${milliseconds} from record: ${record.client_message}`
         );
         if (!isNaN(milliseconds)) {
           const seconds = milliseconds / 1000;
           totalFeedUsed += seconds * 0.4;
-          console.log(`Total feed used so far: ${totalFeedUsed}`);
+          console.log(
+            `Total feed used so far from FeedingDone: ${totalFeedUsed}`
+          );
         } else {
           console.warn(
-            `Skipping record with invalid milliseconds: ${record.client_message}`
+            `Skipping record with invalid milliseconds in 61: ${record.client_message}`
           );
         }
       } catch (error) {
@@ -187,17 +82,48 @@ const getFeedPercentage = async (feederId) => {
       }
     });
 
-    const adjustedFeedUsed = Math.max(0, totalFeedUsed);
+    let totalFeedUsedFeedNow = 0;
+
+    // Calculate feed used based on client messages
+    clientMessages.forEach((record) => {
+      try {
+        const clientMessage = JSON.parse(record.client_message);
+        const milliseconds = parseInt(clientMessage["31"], 10);
+        console.log(
+          `Parsed milliseconds from 31: ${milliseconds} from client_message: ${record.client_message}`
+        );
+        if (!isNaN(milliseconds)) {
+          const seconds = milliseconds / 1000;
+          totalFeedUsedFeedNow += seconds * 0.4;
+          console.log(
+            `Total feed used so far from ClientMessages: ${totalFeedUsedFeedNow}`
+          );
+        } else {
+          console.warn(
+            `Skipping record with invalid milliseconds in 31: ${record.client_message}`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `Error parsing client_message for record: ${record.client_message}`,
+          error
+        );
+      }
+    });
+
+    const adjustedFeedUsed = Math.max(0, totalFeedUsed + totalFeedUsedFeedNow);
     const remainingFeed = tankCapacity - adjustedFeedUsed;
     const feedLevelPercentage = (remainingFeed / tankCapacity) * 100;
 
     console.log(
-      `Total feed used: ${totalFeedUsed}, Remaining feed: ${remainingFeed}, Feed level percentage: ${feedLevelPercentage}%`
+      `Total feed used: ${
+        totalFeedUsed + totalFeedUsedFeedNow
+      }, Remaining feed: ${remainingFeed}, Feed level percentage: ${feedLevelPercentage}%`
     );
 
     return feedLevelPercentage;
   } catch (error) {
-    console.error("Error fetching feeding done records:", error);
+    console.error("Error fetching records:", error);
     throw error;
   }
 };

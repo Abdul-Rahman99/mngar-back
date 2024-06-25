@@ -382,7 +382,7 @@ const getBirdsDataForGraph = async (req, res) => {
       birdsData[index].speciesInfo = elementCam1.speciesInfo + elementCam2.speciesInfo;
     }
   }
-
+  console.log(birdsData);
   birdsData?.forEach(({ time, speciesInfo, maxCount }) => {
     // append data for pie graph
     JSON.parse(speciesInfo)?.forEach((species_detected_arr) => {

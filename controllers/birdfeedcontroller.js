@@ -310,7 +310,7 @@ const getBirdsDataForGraph = async (req, res) => {
       sdateto = datefrom;
   }
 
-  const query = `
+  const queryCam1 = `
         SELECT
             ${timeRangeGroupByField} as time,
             CONCAT(
@@ -325,7 +325,7 @@ const getBirdsDataForGraph = async (req, res) => {
         
         WHERE
             feeder_id = ${feederId} AND 
-            client_topic in ('Processed1json', 'Processed2json') AND
+            client_topic in ('Processed1json') AND
             DATE(createdAt) BETWEEN '${datefrom}' AND '${sdateto}'
        
         GROUP BY
@@ -335,13 +335,54 @@ const getBirdsDataForGraph = async (req, res) => {
             createdAt ASC
     `;
 
-  const birdsData = await models.sequelize.query(query, {
+  const queryCam2 = `
+        SELECT
+            ${timeRangeGroupByField} as time,
+            CONCAT(
+    '[',
+    GROUP_CONCAT(UPPER(json_extract(client_message, '$.species_detected'))),
+    ']'
+            ) as speciesInfo,
+            MAX(json_extract(client_message, '$.countBirds')) as maxCount
+        
+        FROM
+            BirdsData
+        
+        WHERE
+            feeder_id = ${feederId} AND 
+            client_topic in ('Processed2json') AND
+            DATE(createdAt) BETWEEN '${datefrom}' AND '${sdateto}'
+       
+        GROUP BY
+            time
+
+        ORDER BY
+            createdAt ASC
+    `;
+
+  const birdsDataCam1 = await models.sequelize.query(queryCam1, {
     type: QueryTypes.SELECT,
   });
 
+  const birdsDataCam2 = await models.sequelize.query(queryCam2, {
+    type: QueryTypes.SELECT,
+  });
+
+  let birdsData;
   const birdspiedata = new Map();
   const data = new Map();
 
+  for (let index = 0; index < birdsDataCam1.length; index++) {
+    const elementCam1 = birdsDataCam1[index];
+    const elementCam2 = birdsDataCam2[index];
+
+    if(elementCam1.time == elementCam2.time){
+      birdsData[index].time = elementCam1.time;
+      birdsData[index].maxCount = elementCam1.maxCount + elementCam2.maxCount;
+      birdsData[index].speciesInfo = elementCam1.speciesInfo + elementCam2.speciesInfo;
+    }
+  }
+  console.log(birdsData);
   birdsData?.forEach(({ time, speciesInfo, maxCount }) => {
     // append data for pie graph
     JSON.parse(speciesInfo)?.forEach((species_detected_arr) => {
